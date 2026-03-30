@@ -1,6 +1,6 @@
 import React from "react";
 import { format } from "date-fns";
-import { Activity, AlertTriangle, Clock, TrendingUp, PackageSearch, ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { Activity, AlertTriangle, Clock, TrendingUp, PackageSearch, ArrowDownRight, ArrowUpRight, ShoppingCart, PackagePlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetProducts, useGetSales, useGetTransactions, useGetStockUpdates } from "@workspace/api-client-react";
 import { formatKES } from "@/lib/utils";
