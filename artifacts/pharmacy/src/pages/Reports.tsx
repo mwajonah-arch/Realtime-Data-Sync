@@ -1,13 +1,13 @@
 import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
-import { useGetTransactions, useGetSales } from "@workspace/api-client-react";
+import { useTransactions, useSales } from "@/lib/useFirebase";
 import { formatKES } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 
 export default function Reports() {
-  const { data: transactions = [] } = useGetTransactions();
-  const { data: sales = [] } = useGetSales();
+  const { data: transactions } = useTransactions();
+  const { data: sales } = useSales();
 
   const totalInc = transactions.reduce((s, t) => s + (t.income || 0), 0);
   const totalExp = transactions.reduce((s, t) => s + (t.expense || 0), 0);
@@ -101,7 +101,7 @@ export default function Reports() {
           <table className="w-full text-sm">
             <tbody className="divide-y divide-border">
               {[...sales].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(s => (
-                <tr key={s.id} className="hover:bg-muted/30">
+                <tr key={s._key} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground w-40">{format(new Date(s.createdAt), "dd MMM yy HH:mm")}</td>
                   <td className="px-4 py-3">{s.items.map(i => `${i.productName} ×${i.qty}`).join(", ")}</td>
                   <td className="px-4 py-3 font-mono text-right text-primary font-bold">{formatKES(s.total)}</td>

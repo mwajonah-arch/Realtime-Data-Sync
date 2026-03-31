@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { Shield, User, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/lib/useFirebase";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 
 export default function Login() {
   const { login } = useAuth();
+  const { adminPassword } = useSettings();
   const [role, setRole] = useState<"staff" | "admin">("staff");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,12 +16,10 @@ export default function Login() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
-    if (role === "admin" && password !== "admin1234") {
+    if (role === "admin" && password !== adminPassword) {
       setError("Incorrect password.");
       return;
     }
-    
     login(role);
   };
 
@@ -81,7 +81,7 @@ export default function Login() {
               </label>
               <Input
                 type="password"
-                placeholder="Enter password (admin1234)"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus

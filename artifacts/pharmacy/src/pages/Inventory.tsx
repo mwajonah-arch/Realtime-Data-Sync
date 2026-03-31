@@ -3,17 +3,10 @@ import { Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  useGetProducts, 
-  useCreateProduct, 
-  useUpdateProduct, 
-  useDeleteProduct,
-  getGetProductsQueryKey 
-} from "@workspace/api-client-react";
+import { useProducts, addProduct, updateProduct, deleteProduct } from "@/lib/useFirebase";
 import { formatKES } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -40,41 +33,12 @@ export default function Inventory() {
   const isAdmin = role === "admin";
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const queryClient = useQueryClient();
-  const { data: products = [], isLoading } = useGetProducts();
-  
-  const createMut = useCreateProduct({
-    mutation: {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-        logActivity("add", `Added product: ${data.name}`);
-        setIsModalOpen(false);
-      }
-    }
-  });
+  const { data: products, loading: isLoading } = useProducts();
 
-  const updateMut = useUpdateProduct({
-    mutation: {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-        logActivity("edit", `Edited product: ${data.name}`);
-        setIsModalOpen(false);
-      }
-    }
-  });
-
-  const deleteMut = useDeleteProduct({
-    mutation: {
-      onSuccess: (_, variables) => {
-        queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-        logActivity("delete", `Deleted product ID: ${variables.id}`);
-      }
-    }
-  });
-
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProductFormValues>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: { cat: "Analgesics", unit: "Tabs", qty: 0, low: 10, buy: 0, sell: 0, expiry: "", supplier: "" }
   });
@@ -85,13 +49,13 @@ export default function Inventory() {
   );
 
   const openAdd = () => {
-    setEditingId(null);
+    setEditingKey(null);
     reset({ cat: "Analgesics", unit: "Tabs", qty: 0, low: 10, buy: 0, sell: 0, expiry: "", supplier: "" });
     setIsModalOpen(true);
   };
 
   const openEdit = (p: any) => {
-    setEditingId(p.id);
+    setEditingKey(p._key);
     reset({
       name: p.name, cat: p.cat, unit: p.unit, qty: p.qty, low: p.low,
       buy: p.buy, sell: p.sell, expiry: p.expiry, supplier: p.supplier
@@ -99,17 +63,26 @@ export default function Inventory() {
     setIsModalOpen(true);
   };
 
-  const onSubmit = (data: ProductFormValues) => {
-    if (editingId) {
-      updateMut.mutate({ id: editingId, data });
-    } else {
-      createMut.mutate({ data });
+  const onSubmit = async (data: ProductFormValues) => {
+    setSaving(true);
+    try {
+      if (editingKey) {
+        await updateProduct(editingKey, data);
+        logActivity("edit", `Edited product: ${data.name}`);
+      } else {
+        await addProduct(data);
+        logActivity("add", `Added product: ${data.name}`);
+      }
+      setIsModalOpen(false);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = (id: number, name: string) => {
+  const handleDelete = async (key: string, name: string) => {
     if (confirm(`Delete "${name}"?`)) {
-      deleteMut.mutate({ id });
+      await deleteProduct(key);
+      logActivity("delete", `Deleted product: ${name}`);
     }
   };
 
@@ -161,7 +134,7 @@ export default function Inventory() {
                   const isLow = p.qty <= p.low;
                   const isOut = p.qty === 0;
                   return (
-                    <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                    <tr key={p._key} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 font-semibold">{p.name}</td>
                       <td className="px-4 py-3"><Badge variant="outline">{p.cat}</Badge></td>
                       <td className={`px-4 py-3 font-mono font-bold ${isOut ? 'text-danger' : isLow ? 'text-warning' : ''}`}>{p.qty}</td>
@@ -179,7 +152,7 @@ export default function Inventory() {
                             <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
                               <Edit2 className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id, p.name)} className="text-danger hover:text-danger hover:bg-danger/10">
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(p._key!, p.name)} className="text-danger hover:text-danger hover:bg-danger/10">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -197,7 +170,7 @@ export default function Inventory() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={editingId ? "Edit Product" : "Add Product"}
+        title={editingKey ? "Edit Product" : "Add Product"}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -254,8 +227,8 @@ export default function Inventory() {
           
           <div className="pt-4 flex justify-end gap-3 border-t border-border mt-4">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={createMut.isPending || updateMut.isPending}>
-              {createMut.isPending || updateMut.isPending ? "Saving..." : "Save Product"}
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save Product"}
             </Button>
           </div>
         </form>

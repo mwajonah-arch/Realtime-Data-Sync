@@ -1,11 +1,11 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
+import { seedIfEmpty } from "@/lib/useFirebase";
 
-// Pages
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Inventory from "@/pages/Inventory";
@@ -18,18 +18,8 @@ import ActivityLog from "@/pages/ActivityLog";
 import MySummary from "@/pages/MySummary";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchInterval: 30000, // 30s for real-time feel
-      refetchOnWindowFocus: true,
-    },
-  },
-});
-
 function ProtectedRouter() {
   const { role } = useAuth();
-  
   if (!role) return <Login />;
 
   return (
@@ -40,8 +30,6 @@ function ProtectedRouter() {
         <Route path="/pos" component={POS} />
         <Route path="/stock-update" component={StockUpdate} />
         <Route path="/my-summary" component={MySummary} />
-        
-        {/* Admin only routes */}
         {role === "admin" && (
           <>
             <Route path="/financials" component={Financials} />
@@ -50,7 +38,6 @@ function ProtectedRouter() {
             <Route path="/activity" component={ActivityLog} />
           </>
         )}
-        
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -58,17 +45,19 @@ function ProtectedRouter() {
 }
 
 function App() {
+  useEffect(() => {
+    seedIfEmpty().catch(console.error);
+  }, []);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <ProtectedRouter />
-          </WouterRouter>
-        </AuthProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider>
+      <AuthProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <ProtectedRouter />
+        </WouterRouter>
+      </AuthProvider>
+      <Toaster />
+    </TooltipProvider>
   );
 }
 

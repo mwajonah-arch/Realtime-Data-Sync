@@ -4,10 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { Plus } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useGetTransactions, useCreateTransaction, getGetTransactionsQueryKey } from "@workspace/api-client-react";
+import { useTransactions, addTransaction } from "@/lib/useFirebase";
 import { formatKES, cn } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -30,26 +29,15 @@ export default function Financials() {
   const { logActivity } = useAuth();
   const [tab, setTab] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  const queryClient = useQueryClient();
-  const { data: transactions = [], isLoading } = useGetTransactions();
-  
-  const createMut = useCreateTransaction({
-    mutation: {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: getGetTransactionsQueryKey() });
-        logActivity("add", `Added transaction: ${data.desc}`);
-        setIsModalOpen(false);
-      }
-    }
-  });
+  const [saving, setSaving] = useState(false);
+
+  const { data: transactions, loading: isLoading } = useTransactions();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TxnFormValues>({
     resolver: zodResolver(txnSchema),
     defaultValues: { date: format(new Date(), "yyyy-MM-dd"), account: "Cash", category: "Other", income: 0, expense: 0 }
   });
 
-  // Calculate tabs (months)
   const monthMap = new Set<string>();
   transactions.forEach(t => monthMap.add(format(new Date(t.date), "MMM yyyy")));
   const months = ["all", ...Array.from(monthMap).sort((a,b) => new Date(b).getTime() - new Date(a).getTime())];
@@ -72,7 +60,17 @@ export default function Financials() {
     grouped[mk].push(t);
   });
 
-  const onSubmit = (data: TxnFormValues) => createMut.mutate({ data });
+  const onSubmit = async (data: TxnFormValues) => {
+    setSaving(true);
+    try {
+      await addTransaction(data);
+      logActivity("add", `Added transaction: ${data.desc}`);
+      setIsModalOpen(false);
+      reset();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -122,7 +120,7 @@ export default function Financials() {
                 <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
               ) : (
                 Object.entries(grouped).map(([month, rows]) => {
-                  let html = [];
+                  const html: React.ReactNode[] = [];
                   let mInc = 0;
                   let mExp = 0;
                   
@@ -132,7 +130,7 @@ export default function Financials() {
                     mExp += (t.expense || 0);
                     
                     html.push(
-                      <tr key={t.id} className="hover:bg-muted/20">
+                      <tr key={t._key} className="hover:bg-muted/20">
                         <td className="px-4 py-3 font-mono text-xs">{format(new Date(t.date), "dd MMM yyyy")}</td>
                         <td className="px-4 py-3 text-muted-foreground">{t.account}</td>
                         <td className="px-4 py-3"><Badge variant="outline">{t.category}</Badge></td>
@@ -186,6 +184,7 @@ export default function Financials() {
             <div className="space-y-1 col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</label>
               <Input {...register("desc")} placeholder="Brief description" />
+              {errors.desc && <span className="text-xs text-danger">{errors.desc.message}</span>}
             </div>
 
             <div className="space-y-1">
@@ -201,7 +200,7 @@ export default function Financials() {
           
           <div className="pt-4 flex justify-end gap-3 border-t border-border mt-4">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={createMut.isPending}>{createMut.isPending ? "Saving..." : "Save"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
           </div>
         </form>
       </Modal>

@@ -1,23 +1,19 @@
 import React from "react";
 import { format } from "date-fns";
-import { useGetSales, useGetStockUpdates, useGetProducts } from "@workspace/api-client-react";
+import { useSales, useStockUpdates, useProducts } from "@/lib/useFirebase";
 import { formatKES } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Package, ShoppingCart } from "lucide-react";
 
 export default function MySummary() {
-  const { data: sales = [] } = useGetSales();
-  const { data: stockUpdates = [] } = useGetStockUpdates();
-  const { data: products = [] } = useGetProducts();
+  const { data: sales } = useSales();
+  const { data: stockUpdates } = useStockUpdates();
+  const { data: products } = useProducts();
 
   const thisMonth = format(new Date(), "MMM yyyy");
-  
-  // We assume all data is visible to the staff member as "their summary" for the prototype
-  // In a real app we'd filter by user ID.
   const monthSales = sales.filter(s => format(new Date(s.createdAt), "MMM yyyy") === thisMonth);
   const monthStock = stockUpdates.filter(u => format(new Date(u.createdAt), "MMM yyyy") === thisMonth);
   const stockVal = products.reduce((s, p) => s + (p.qty * p.sell), 0);
-  
   const allStockItems = monthStock.flatMap(u => u.items.map(i => ({ ...i, date: u.createdAt, note: u.note })));
 
   return (
@@ -44,7 +40,7 @@ export default function MySummary() {
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-border">
                   {[...monthSales].reverse().map(s => (
-                    <tr key={s.id} className="hover:bg-muted/30">
+                    <tr key={s._key} className="hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{format(new Date(s.createdAt), "dd MMM HH:mm")}</td>
                       <td className="px-4 py-3">{s.items.map(i => `${i.productName}×${i.qty}`).join(", ")}</td>
                       <td className="px-4 py-3 font-mono text-right text-primary font-bold">{formatKES(s.total)}</td>

@@ -1,21 +1,19 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
-import { useGetSales, useGetStockUpdates, useGetActivityLog } from "@workspace/api-client-react";
+import { useSales, useStockUpdates, useActivityLog } from "@/lib/useFirebase";
 import { formatKES } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 
 export default function EndOfDay() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   
-  const { data: sales = [] } = useGetSales();
-  const { data: stockUpdates = [] } = useGetStockUpdates();
-  const { data: log = [] } = useGetActivityLog();
+  const { data: sales } = useSales();
+  const { data: stockUpdates } = useStockUpdates();
+  const { data: log } = useActivityLog();
 
   const dSales = sales.filter(s => s.createdAt.startsWith(date));
   const dStock = stockUpdates.filter(u => u.createdAt.startsWith(date));
-  const dLog = log.filter(e => e.ts.startsWith(date));
 
   const salesTotal = dSales.reduce((sum, s) => sum + s.total, 0);
   const totalItemsSold = dSales.reduce((sum, s) => sum + s.items.reduce((a,i) => a + i.qty, 0), 0);
@@ -70,7 +68,7 @@ export default function EndOfDay() {
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-border">
                   {[...dSales].reverse().map(s => (
-                    <tr key={s.id} className="hover:bg-muted/30">
+                    <tr key={s._key} className="hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{format(new Date(s.createdAt), "HH:mm")}</td>
                       <td className="px-4 py-3">{s.items.map(i => `${i.productName}×${i.qty}`).join(', ')}</td>
                       <td className="px-4 py-3 font-mono text-right text-primary font-bold">{formatKES(s.total)}</td>

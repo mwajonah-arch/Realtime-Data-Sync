@@ -1,8 +1,8 @@
 import React from "react";
 import { format } from "date-fns";
-import { Activity, AlertTriangle, Clock, TrendingUp, PackageSearch, ArrowDownRight, ArrowUpRight, ShoppingCart, PackagePlus } from "lucide-react";
+import { Activity, AlertTriangle, Clock, TrendingUp, PackageSearch, ArrowDownRight, ShoppingCart, PackagePlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGetProducts, useGetSales, useGetTransactions, useGetStockUpdates } from "@workspace/api-client-react";
+import { useProducts, useSales, useTransactions, useStockUpdates } from "@/lib/useFirebase";
 import { formatKES } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,10 +13,10 @@ export default function Dashboard() {
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const monthStr = format(new Date(), "MMM yyyy");
 
-  const { data: products = [] } = useGetProducts();
-  const { data: sales = [] } = useGetSales();
-  const { data: transactions = [] } = useGetTransactions();
-  const { data: stockUpdates = [] } = useGetStockUpdates();
+  const { data: products } = useProducts();
+  const { data: sales } = useSales();
+  const { data: transactions } = useTransactions();
+  const { data: stockUpdates } = useStockUpdates();
 
   const lowStock = products.filter(p => p.qty <= p.low);
   const expSoon = products.filter(p => {
@@ -74,7 +74,7 @@ export default function Dashboard() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {lowStock.map(p => (
-                        <tr key={p.id} className="hover:bg-muted/30">
+                        <tr key={p._key} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-medium">{p.name}</td>
                           <td className={`px-4 py-3 font-mono ${p.qty === 0 ? "text-danger font-bold" : "text-warning font-bold"}`}>{p.qty}</td>
                           <td className="px-4 py-3">
@@ -109,7 +109,7 @@ export default function Dashboard() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {expSoon.map(p => (
-                        <tr key={p.id} className="hover:bg-muted/30">
+                        <tr key={p._key} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-medium">{p.name}</td>
                           <td className="px-4 py-3">{p.expiry ? format(new Date(p.expiry), "dd MMM yyyy") : "—"}</td>
                           <td className="px-4 py-3 font-mono text-warning font-bold">
@@ -145,7 +145,7 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-border">
                 {[...transactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8).map(t => (
-                  <tr key={t.id} className="hover:bg-muted/30">
+                  <tr key={t._key} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-mono text-xs">{format(new Date(t.date), "dd MMM yyyy")}</td>
                     <td className="px-4 py-3">{t.desc}</td>
                     <td className="px-4 py-3"><Badge variant="outline">{t.category}</Badge></td>
@@ -165,7 +165,6 @@ export default function Dashboard() {
     );
   }
 
-  // STAFF DASHBOARD
   const allTodayStockItems = todayStock.flatMap(u => u.items.map(i => ({...i, note: u.note})));
   
   return (
@@ -200,7 +199,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {[...todaySales].reverse().slice(0,10).map(s => (
-                    <tr key={s.id} className="hover:bg-muted/30">
+                    <tr key={s._key} className="hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs">{format(new Date(s.createdAt), "HH:mm")}</td>
                       <td className="px-4 py-3">{s.items.map(i => `${i.productName}×${i.qty}`).join(", ")}</td>
                       <td className="px-4 py-3 font-mono text-right text-primary font-bold">{formatKES(s.total)}</td>
@@ -238,7 +237,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
     </div>
   );
 }

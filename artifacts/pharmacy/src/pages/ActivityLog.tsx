@@ -1,25 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { format } from "date-fns";
 import { Trash2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useGetActivityLog, useClearActivityLog, getGetActivityLogQueryKey } from "@workspace/api-client-react";
+import { useActivityLog, clearActivityLog } from "@/lib/useFirebase";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
 export default function ActivityLog() {
-  const queryClient = useQueryClient();
-  const { data: log = [], isLoading } = useGetActivityLog();
-  const clearMut = useClearActivityLog({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetActivityLogQueryKey() });
+  const { data: log, loading: isLoading } = useActivityLog();
+  const [clearing, setClearing] = useState(false);
+
+  const handleClear = async () => {
+    if (confirm("Clear all activity log?")) {
+      setClearing(true);
+      try {
+        await clearActivityLog();
+      } finally {
+        setClearing(false);
       }
     }
-  });
-
-  const handleClear = () => {
-    if (confirm("Clear all activity log?")) clearMut.mutate();
   };
 
   const getIcon = (action: string) => {
@@ -42,7 +41,7 @@ export default function ActivityLog() {
           <h1 className="text-3xl font-bold tracking-tight">Staff Activity</h1>
           <p className="text-muted-foreground mt-1">All actions across the system</p>
         </div>
-        <Button variant="danger" onClick={handleClear} disabled={log.length === 0 || clearMut.isPending}>
+        <Button variant="danger" onClick={handleClear} disabled={log.length === 0 || clearing}>
           <Trash2 className="w-4 h-4 mr-2" /> Clear Log
         </Button>
       </div>
@@ -65,7 +64,7 @@ export default function ActivityLog() {
                 <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No activity yet</td></tr>
               ) : (
                 [...log].sort((a,b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()).map(e => (
-                  <tr key={e.id} className="hover:bg-muted/20">
+                  <tr key={e._key} className="hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{format(new Date(e.ts), "dd MMM HH:mm")}</td>
                     <td className="px-4 py-3">
                       <Badge variant={e.role === 'admin' ? 'admin' : 'success'}>{e.role}</Badge>
